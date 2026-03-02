@@ -1,5 +1,5 @@
 # Hardened Docker Compose for Secure OpenClaw
-# Upgraded with VISAclaw security features
+# Upgraded with SecureClaw security features
 #
 # Security improvements:
 # - Default-deny seccomp profile (blocks ptrace, mount, unshare, bpf, etc.)

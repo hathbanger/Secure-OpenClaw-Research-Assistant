@@ -1,8 +1,8 @@
 # Secure OpenClaw Research Assistant
 
-Run OpenClaw as a **secure research assistant** with **VISAclaw security hardening**, maximum container isolation, and **persistent memory** for learning your preferences.
+Run OpenClaw as a **secure research assistant** with **SecureClaw security hardening**, maximum container isolation, and **persistent memory** for learning your preferences.
 
-## New in v3.0 - VISAclaw Security Upgrade
+## New in v3.0 - SecureClaw Security Upgrade
 - **Default-deny seccomp profile** - Blocks dangerous syscalls (ptrace, mount, bpf, etc.)
 - **Discord + Telegram support** - Multi-channel communication
 - **GitHub push capability** - Agent can push code to repos (optional)
