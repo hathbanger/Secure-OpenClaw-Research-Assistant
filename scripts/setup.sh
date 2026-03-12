@@ -39,11 +39,15 @@ echo -e "${YELLOW}[3/6]${NC} Copying configuration files..."
 sed "s/REPLACE_WITH_OUTPUT_OF_openssl_rand_-hex_32/$TOKEN/" \
     "$SCRIPT_DIR/config/openclaw.json" > ~/.openclaw/openclaw.json
 
-# Copy env template and add token
+# Copy env template and add token + required volume paths
 cp "$SCRIPT_DIR/config/env.template" ~/.openclaw/.env
 echo "" >> ~/.openclaw/.env
 echo "# Auto-generated token (matches openclaw.json)" >> ~/.openclaw/.env
 echo "OPENCLAW_GATEWAY_TOKEN=$TOKEN" >> ~/.openclaw/.env
+echo "" >> ~/.openclaw/.env
+echo "# Docker volume paths (required by docker-compose.yml)" >> ~/.openclaw/.env
+echo "OPENCLAW_CONFIG_DIR=$HOME/.openclaw" >> ~/.openclaw/.env
+echo "OPENCLAW_WORKSPACE_DIR=$HOME/.openclaw/workspace" >> ~/.openclaw/.env
 chmod 600 ~/.openclaw/.env
 
 # Copy agent SOUL file
@@ -79,7 +83,8 @@ echo -e "${GREEN}✓${NC} Scripts installed"
 echo ""
 echo -e "${YELLOW}[6/6]${NC} Installing seccomp profile..."
 if [ -d ~/openclaw-sandbox/openclaw ]; then
-    cp "$SCRIPT_DIR/config/seccomp-profile.json" ~/openclaw-sandbox/openclaw/
+    mkdir -p ~/openclaw-sandbox/openclaw/config
+    cp "$SCRIPT_DIR/config/seccomp-profile.json" ~/openclaw-sandbox/openclaw/config/
     echo -e "${GREEN}✓${NC} Seccomp profile installed"
 fi
 
@@ -90,26 +95,36 @@ echo "================================================"
 echo ""
 echo "Next steps:"
 echo ""
-echo "1. Create a Telegram bot:"
+echo "1. Clone and build OpenClaw (if not already done):"
+echo "   mkdir -p ~/openclaw-sandbox && cd ~/openclaw-sandbox"
+echo "   git clone https://github.com/openclaw/openclaw.git"
+echo "   cd openclaw && docker build -t openclaw:local -f Dockerfile ."
+echo ""
+echo "2. Create a Telegram bot:"
 echo "   - Message @BotFather on Telegram"
 echo "   - Send /newbot and follow prompts"
 echo "   - Save the bot token"
 echo ""
-echo "2. Get your Telegram user ID:"
+echo "3. Get your Telegram user ID:"
 echo "   - Message @userinfobot on Telegram"
 echo ""
-echo "3. Add your credentials:"
+echo "4. Add your credentials:"
 echo "   - Edit ~/.openclaw/.env → add TELEGRAM_BOT_TOKEN"
 echo "   - Edit ~/.openclaw/openclaw.json → add your user ID to allowFrom"
 echo ""
-echo "4. Start the agent (with hardened compose):"
+echo "5. Start the agent (with hardened compose):"
 echo "   cd ~/openclaw-sandbox/openclaw"
-echo "   docker compose -f docker-compose.yml -f docker-compose.hardened.yml up -d"
+echo "   docker compose --env-file ~/.openclaw/.env \\"
+echo "     -f docker-compose.yml \\"
+echo "     -f $SCRIPT_DIR/docker-compose.hardened.yml \\"
+echo "     up -d"
 echo ""
-echo "5. Add Telegram channel:"
-echo "   docker compose -f docker-compose.yml -f docker-compose.hardened.yml \\"
+echo "6. Add Telegram channel:"
+echo "   docker compose --env-file ~/.openclaw/.env \\"
+echo "     -f docker-compose.yml \\"
+echo "     -f $SCRIPT_DIR/docker-compose.hardened.yml \\"
 echo "     run --rm openclaw-cli channels add --channel telegram --token YOUR_TOKEN"
 echo ""
-echo "6. Verify security:"
+echo "7. Verify security:"
 echo "   ~/openclaw-sandbox/verify-security.sh"
 echo ""

@@ -51,16 +51,24 @@ This script will:
 - Copy configuration files (including hardened docker-compose)
 - Create the isolated Docker network
 
-### 3. Add Your Telegram Bot
+### 3. Set Up the Alias
+
+Add this to `~/.zshrc` (or `~/.bashrc`) for shorter commands:
+
+```bash
+alias openclaw-compose='docker compose --env-file ~/.openclaw/.env -f ~/openclaw-sandbox/openclaw/docker-compose.yml -f ~/Secure-OpenClaw-Research-Assistant/docker-compose.hardened.yml'
+```
+
+Then reload: `source ~/.zshrc`
+
+### 4. Add Your Telegram Bot
 
 ```bash
 # Get your bot token from @BotFather on Telegram
 # Get your user ID from @userinfobot on Telegram
 
-# Then run:
 cd ~/openclaw-sandbox/openclaw
-docker compose -f docker-compose.yml -f docker-compose.hardened.yml \
-  run --rm openclaw-cli channels add --channel telegram --token YOUR_BOT_TOKEN
+openclaw-compose run --rm openclaw-cli channels add --channel telegram --token YOUR_BOT_TOKEN
 ```
 
 Edit `~/.openclaw/openclaw.json` and add your Telegram user ID:
@@ -68,19 +76,17 @@ Edit `~/.openclaw/openclaw.json` and add your Telegram user ID:
 "allowFrom": ["YOUR_TELEGRAM_USER_ID"]
 ```
 
-### 4. Start with Hardened Compose
+### 5. Start with Hardened Compose
 
 ```bash
 cd ~/openclaw-sandbox/openclaw
-
-# Start with security hardening overlay
-docker compose -f docker-compose.yml -f docker-compose.hardened.yml up -d
+openclaw-compose up -d
 
 # Verify security
 ~/openclaw-sandbox/verify-security.sh
 
 # Run security audit
-docker compose exec openclaw-gateway node dist/index.js security audit --deep
+openclaw-compose exec openclaw-gateway node dist/index.js security audit --deep
 ```
 
 **Expected output:**
@@ -89,7 +95,7 @@ OpenClaw security audit
 Summary: 0 critical · 3 warn · 1 info
 ```
 
-### 5. Test It
+### 6. Test It
 
 Message your bot on Telegram. It should respond as a read-only research assistant.
 
@@ -129,11 +135,11 @@ The 3 warnings are expected for maximum isolation mode.
 
 ## Common Commands
 
-**Important:** Always use the hardened compose overlay:
+**Important:** Always use the hardened compose overlay via the alias:
 
 ```bash
-# Set alias for convenience (add to ~/.bashrc or ~/.zshrc)
-alias openclaw-compose='docker compose -f docker-compose.yml -f docker-compose.hardened.yml'
+# Add to ~/.zshrc or ~/.bashrc
+alias openclaw-compose='docker compose --env-file ~/.openclaw/.env -f ~/openclaw-sandbox/openclaw/docker-compose.yml -f ~/Secure-OpenClaw-Research-Assistant/docker-compose.hardened.yml'
 ```
 
 | Task | Command |
@@ -303,7 +309,7 @@ Preferences are stored in `~/.openclaw/agents/main/agent/soul.md` and persist ac
 
 **Check logs:**
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.hardened.yml logs openclaw-gateway
+openclaw-compose logs openclaw-gateway
 ```
 
 **Common causes:**
@@ -328,8 +334,8 @@ chmod 600 ~/.openclaw/.env
 **Check:**
 1. Bot token is correct in `.env`
 2. Your user ID is in `allowFrom` array
-3. Gateway is running: `docker compose ps`
-4. Logs for errors: `docker compose logs -f`
+3. Gateway is running: `openclaw-compose ps`
+4. Logs for errors: `openclaw-compose logs -f`
 
 ### "Config invalid" errors
 
@@ -337,7 +343,7 @@ chmod 600 ~/.openclaw/.env
 
 **Run doctor:**
 ```bash
-docker compose exec openclaw-gateway node dist/index.js doctor --fix
+openclaw-compose exec openclaw-gateway node dist/index.js doctor --fix
 ```
 
 ### Resource limit errors
@@ -443,7 +449,7 @@ chmod +x ~/openclaw-sandbox/*.sh
 ### Start with hardening
 ```bash
 cd ~/openclaw-sandbox/openclaw
-docker compose -f docker-compose.yml -f docker-compose.hardened.yml up -d
+openclaw-compose up -d
 ```
 
 </details>
