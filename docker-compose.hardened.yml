@@ -88,7 +88,6 @@ services:
   # ============================================
   openclaw-cli:
     security_opt:
-      - no-new-privileges:true
       - seccomp=config/seccomp-profile.json
     cap_drop:
       - ALL
