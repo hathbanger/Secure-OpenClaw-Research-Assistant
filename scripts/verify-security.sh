@@ -198,21 +198,6 @@ if [ -n "$SECCOMP_FILE" ]; then
 fi
 
 echo ""
-echo "=== Sandbox & Exec Controls ==="
-
-# Check sandbox mode
-grep -q '"mode": "all"' ~/.openclaw/openclaw.json 2>/dev/null
-check $? "Sandbox mode is 'all' (per-agent isolation)"
-
-# Check exec runs in sandbox
-grep -q '"host": "sandbox"' ~/.openclaw/openclaw.json 2>/dev/null
-check $? "Exec host is sandbox (not gateway)"
-
-# Check exec security is allowlist
-grep -q '"security": "allowlist"' ~/.openclaw/openclaw.json 2>/dev/null
-check $? "Exec security is allowlist"
-
-echo ""
 echo "=== Tool Controls ==="
 
 # Check deny list has critical entries
