@@ -1,11 +1,12 @@
 #!/bin/bash
-# Emergency kill switch for OpenClaw agent
-# Usage: ./kill-agent.sh
+# Emergency kill switch for Secure OpenClaw
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-echo "Stopping OpenClaw containers..."
-docker compose -f ~/openclaw-sandbox/openclaw/docker-compose.yml down --remove-orphans
+echo "Stopping Secure OpenClaw containers..."
+cd "$SCRIPT_DIR"
+docker compose down --remove-orphans
 
 echo "Removing isolated network..."
-docker network rm openclaw-isolated 2>/dev/null
+docker network rm openclaw-isolated 2>/dev/null || true
 
 echo "Agent terminated."

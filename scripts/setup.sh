@@ -1,130 +1,146 @@
 #!/bin/bash
-# Secure OpenClaw Setup Script
-# Run this after cloning the config repo
+# Secure OpenClaw Setup
+#
+# Usage:
+#   ./scripts/setup.sh                                    # interactive
+#   OPENCLAW_IMAGE=openclaw:local ./scripts/setup.sh      # with pre-built base image
+#   ./scripts/setup.sh --build-base /path/to/openclaw     # build base image first
 
 set -e
 
-echo "================================================"
-echo "  Secure OpenClaw Setup"
-echo "================================================"
-echo ""
-
-# Colors
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
-NC='\033[0m' # No Color
+RED='\033[0;31m'
+DIM='\033[2m'
+NC='\033[0m'
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ENV_FILE="$SCRIPT_DIR/.env"
+BUILD_BASE=""
+OPENCLAW_SRC=""
 
-# Step 1: Create directories
-echo -e "${YELLOW}[1/6]${NC} Creating secure directories..."
-mkdir -p ~/.openclaw/agents/research-agent/agent
-mkdir -p ~/.openclaw/credentials
-mkdir -p ~/.openclaw/workspace
-mkdir -p ~/.openclaw/logs
-chmod 700 ~/.openclaw ~/.openclaw/credentials ~/.openclaw/workspace ~/.openclaw/logs
-echo -e "${GREEN}✓${NC} Directories created with secure permissions"
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --build-base)
+            BUILD_BASE=1
+            OPENCLAW_SRC="$2"
+            shift 2
+            ;;
+        *)
+            shift
+            ;;
+    esac
+done
 
-# Step 2: Generate token
+echo "================================================"
+echo "  Secure OpenClaw — Shield Setup"
+echo "================================================"
 echo ""
-echo -e "${YELLOW}[2/6]${NC} Generating auth token..."
-TOKEN=$(openssl rand -hex 32)
-echo -e "${GREEN}✓${NC} Token generated"
 
-# Step 3: Copy and configure files
-echo ""
-echo -e "${YELLOW}[3/6]${NC} Copying configuration files..."
-
-# Copy openclaw.json and replace token placeholder
-sed "s/REPLACE_WITH_OUTPUT_OF_openssl_rand_-hex_32/$TOKEN/" \
-    "$SCRIPT_DIR/config/openclaw.json" > ~/.openclaw/openclaw.json
-
-# Copy env template and add token + required volume paths
-cp "$SCRIPT_DIR/config/env.template" ~/.openclaw/.env
-echo "" >> ~/.openclaw/.env
-echo "# Auto-generated token (matches openclaw.json)" >> ~/.openclaw/.env
-echo "OPENCLAW_GATEWAY_TOKEN=$TOKEN" >> ~/.openclaw/.env
-echo "" >> ~/.openclaw/.env
-echo "# Docker volume paths (required by docker-compose.yml)" >> ~/.openclaw/.env
-echo "OPENCLAW_CONFIG_DIR=$HOME/.openclaw" >> ~/.openclaw/.env
-echo "OPENCLAW_WORKSPACE_DIR=$HOME/.openclaw/workspace" >> ~/.openclaw/.env
-chmod 600 ~/.openclaw/.env
-
-# Copy agent SOUL file
-cp -r "$SCRIPT_DIR/agents/"* ~/.openclaw/agents/
-
-# Copy hardened docker-compose overlay
-if [ -d ~/openclaw-sandbox/openclaw ]; then
-    cp "$SCRIPT_DIR/docker-compose.hardened.yml" ~/openclaw-sandbox/openclaw/
-    echo -e "${GREEN}✓${NC} Hardened docker-compose overlay installed"
+# Step 1: Build base image if requested
+if [ -n "$BUILD_BASE" ]; then
+    if [ ! -f "$OPENCLAW_SRC/Dockerfile" ]; then
+        echo -e "${RED}✗${NC} No Dockerfile found at $OPENCLAW_SRC"
+        exit 1
+    fi
+    echo -e "${YELLOW}[1/4]${NC} Building base OpenClaw image..."
+    docker build -t openclaw:local -f "$OPENCLAW_SRC/Dockerfile" "$OPENCLAW_SRC"
+    echo -e "${GREEN}✓${NC} Base image built: openclaw:local"
 else
-    echo -e "${YELLOW}⚠${NC} OpenClaw not found at ~/openclaw-sandbox/openclaw"
-    echo "   Copy docker-compose.hardened.yml there manually after cloning OpenClaw"
+    echo -e "${YELLOW}[1/4]${NC} Checking for base image..."
+    if docker image inspect "${OPENCLAW_IMAGE:-openclaw:local}" >/dev/null 2>&1; then
+        echo -e "${GREEN}✓${NC} Base image found: ${OPENCLAW_IMAGE:-openclaw:local}"
+    else
+        echo -e "${RED}✗${NC} Base image '${OPENCLAW_IMAGE:-openclaw:local}' not found."
+        echo ""
+        echo "  Either build it first:"
+        echo "    cd /path/to/openclaw && docker build -t openclaw:local -f Dockerfile ."
+        echo ""
+        echo "  Or let this script do it:"
+        echo "    ./scripts/setup.sh --build-base /path/to/openclaw"
+        exit 1
+    fi
 fi
 
-echo -e "${GREEN}✓${NC} Configuration files installed"
-
-# Step 4: Create Docker network
+# Step 2: Generate .env if it doesn't exist
 echo ""
-echo -e "${YELLOW}[4/6]${NC} Creating isolated Docker network..."
-docker network create --internal openclaw-isolated 2>/dev/null || echo "Network already exists"
-echo -e "${GREEN}✓${NC} Docker network ready"
+echo -e "${YELLOW}[2/4]${NC} Configuring secrets..."
 
-# Step 5: Copy scripts
-echo ""
-echo -e "${YELLOW}[5/6]${NC} Installing scripts..."
-mkdir -p ~/openclaw-sandbox
-cp "$SCRIPT_DIR/scripts/kill-agent.sh" ~/openclaw-sandbox/
-cp "$SCRIPT_DIR/scripts/verify-security.sh" ~/openclaw-sandbox/
-chmod +x ~/openclaw-sandbox/*.sh
-echo -e "${GREEN}✓${NC} Scripts installed"
+if [ -f "$ENV_FILE" ]; then
+    echo -e "${DIM}  .env already exists — skipping generation${NC}"
+    echo -e "${GREEN}✓${NC} Using existing .env"
+else
+    TOKEN=$(openssl rand -hex 32)
 
-# Step 6: Copy seccomp profile
-echo ""
-echo -e "${YELLOW}[6/6]${NC} Installing seccomp profile..."
-if [ -d ~/openclaw-sandbox/openclaw ]; then
-    mkdir -p ~/openclaw-sandbox/openclaw/config
-    cp "$SCRIPT_DIR/config/seccomp-profile.json" ~/openclaw-sandbox/openclaw/config/
-    echo -e "${GREEN}✓${NC} Seccomp profile installed"
+    cat > "$ENV_FILE" <<ENVEOF
+# Secure OpenClaw — Environment
+# Generated: $(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+# Gateway auth token (auto-generated)
+OPENCLAW_GATEWAY_TOKEN=$TOKEN
+
+# --- Required ---
+ANTHROPIC_API_KEY=
+
+# --- Channels (at least one) ---
+TELEGRAM_BOT_TOKEN=
+DISCORD_BOT_TOKEN=
+
+# --- Optional ---
+GEMINI_API_KEY=
+RESEND_API_KEY=
+BRAVE_API_KEY=
+GH_TOKEN=
+GITHUB_TOKEN=
+
+# --- Git identity for agent commits ---
+GIT_AUTHOR_NAME=OpenClaw
+GIT_AUTHOR_EMAIL=openclaw@users.noreply.github.com
+GIT_COMMITTER_NAME=OpenClaw
+GIT_COMMITTER_EMAIL=openclaw@users.noreply.github.com
+
+# --- Base image (change if using a custom build) ---
+OPENCLAW_IMAGE=openclaw:local
+OPENCLAW_MODEL=claude-opus-4-5-20251101
+ENVEOF
+
+    chmod 600 "$ENV_FILE"
+    echo -e "${GREEN}✓${NC} .env created at $ENV_FILE"
+    echo -e "${YELLOW}  ⚠ Fill in ANTHROPIC_API_KEY + at least one channel token before starting${NC}"
 fi
+
+# Step 3: Build the hardened image
+echo ""
+echo -e "${YELLOW}[3/4]${NC} Building hardened image..."
+cd "$SCRIPT_DIR"
+docker compose build
+echo -e "${GREEN}✓${NC} Image built: openclaw-secure:local"
+
+# Step 4: Create network
+echo ""
+echo -e "${YELLOW}[4/4]${NC} Creating isolated Docker network..."
+docker network create --internal openclaw-isolated 2>/dev/null || true
+echo -e "${GREEN}✓${NC} Network ready"
 
 echo ""
 echo "================================================"
-echo -e "${GREEN}  Setup Complete!${NC}"
+echo -e "${GREEN}  Shield Built${NC}"
 echo "================================================"
 echo ""
-echo "Next steps:"
+echo "Configure:"
+echo "  $ENV_FILE"
+echo "  config/openclaw.json → add user IDs to allowFrom"
 echo ""
-echo "1. Clone and build OpenClaw (if not already done):"
-echo "   mkdir -p ~/openclaw-sandbox && cd ~/openclaw-sandbox"
-echo "   git clone https://github.com/openclaw/openclaw.git"
-echo "   cd openclaw && docker build -t openclaw:local -f Dockerfile ."
+echo "Run:"
+echo "  cd $SCRIPT_DIR"
+echo "  docker compose up -d"
 echo ""
-echo "2. Create a Telegram bot:"
-echo "   - Message @BotFather on Telegram"
-echo "   - Send /newbot and follow prompts"
-echo "   - Save the bot token"
+echo "Verify:"
+echo "  ./scripts/verify-security.sh"
 echo ""
-echo "3. Get your Telegram user ID:"
-echo "   - Message @userinfobot on Telegram"
+echo "Stop:"
+echo "  docker compose down"
 echo ""
-echo "4. Add your credentials:"
-echo "   - Edit ~/.openclaw/.env → add TELEGRAM_BOT_TOKEN"
-echo "   - Edit ~/.openclaw/openclaw.json → add your user ID to allowFrom"
-echo ""
-echo "5. Start the agent (with hardened compose):"
-echo "   cd ~/openclaw-sandbox/openclaw"
-echo "   docker compose --env-file ~/.openclaw/.env \\"
-echo "     -f docker-compose.yml \\"
-echo "     -f $SCRIPT_DIR/docker-compose.hardened.yml \\"
-echo "     up -d"
-echo ""
-echo "6. Add Telegram channel:"
-echo "   docker compose --env-file ~/.openclaw/.env \\"
-echo "     -f docker-compose.yml \\"
-echo "     -f $SCRIPT_DIR/docker-compose.hardened.yml \\"
-echo "     run --rm openclaw-cli channels add --channel telegram --token YOUR_TOKEN"
-echo ""
-echo "7. Verify security:"
-echo "   ~/openclaw-sandbox/verify-security.sh"
+echo "Emergency kill:"
+echo "  ./scripts/kill-agent.sh"
 echo ""
